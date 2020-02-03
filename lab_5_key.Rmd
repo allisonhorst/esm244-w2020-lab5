@@ -31,6 +31,7 @@ Follow along with these steps to make your gh-pages branch:
 - Update your ReadMe to say something unique, then commit
 - Check that it can be viewed as a website with `your-user-name.github.io/repo-name/`
 - Clone your repo to work locally in RStudio
+- Copy and paste the `data` folder for this week into your project 
 - Create a new .Rmd called `us-renewables.Rmd`
 
 In that .Rmd: 
@@ -241,3 +242,18 @@ world_base +
   coord_sf(xlim = c(-20, 50), ylim = c(-40, 40), expand = FALSE)
 ```
 
+## Making this a web page:
+
+- Knit to create the html
+- Push all updates back to GitHub
+
+Since you are working in a gh-pages branch, this can be a webpage! 
+
+- Go to your-github-username.github.io/repo-name/file-name-prefix
+- You should see the webpage containing your knitted document!
+
+- Troubleshooting:
+        - Don't including a trailing slash (404 error)
+        - Don't include the .Rmd extension (will ask to download .Rmd)
+        
+# End Lab Week 5
