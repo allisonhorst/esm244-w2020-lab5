@@ -8,7 +8,9 @@ We'll explore data from the US Energy Information Administration on [renewable e
 ### Packages required: 
 
 - `tidyverse`
+- `janitor`
 - `lubridate`
 - `feasts`
-- `fable`
-
+- `forecast`
+- `paletteer`
+- `tsibble`
