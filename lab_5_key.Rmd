@@ -1,0 +1,182 @@
+---
+title: 'Lab week 5: time series with feast & fable'
+author: "Allison Horst"
+date: "2/2/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+### 0. Attach packages
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(tsibble)
+# library(tsibbledata)
+library(feasts) # Possibly get dev version (gg_season issue): remotes::install_github("tidyverts/feasts")
+library(forecast)
+library(paletteer)
+```
+
+### 1. Get the data
+
+We'll explore, then forecast, US energy consumption and production by renewables source. Get the data from `renewables_cons_prod.csv`:
+
+```{r}
+us_renew <- read_csv("renewables_cons_prod.csv") %>% 
+  clean_names()
+```
+
+Explore the data frame:
+
+```{r}
+# View(us_renew)
+# names(us_renew)
+# unique(us_renew$description)
+```
+
+We'll focus on consumption data. 
+
+### Clean up data
+
+- Convert description to all lowercase
+- Only keep observations for "consumption"
+- Remove any "total" observations
+
+```{r}
+renew_clean <- us_renew %>% 
+  mutate(description = str_to_lower(description)) %>% 
+  filter(str_detect(description, pattern = "consumption")) %>% 
+  filter(!str_detect(description, pattern = "total"))
+```
+
+### Convert `yyyymm` column to tsibble with `lubridate`
+
+```{r}
+renew_date <- renew_clean %>% 
+  mutate(month = lubridate::parse_date_time(yyyymm, "ym")) %>% 
+  mutate(month = yearmonth(month)) %>% #coerce to `yearmonth` format
+  mutate(value = as.numeric(value)) %>% 
+  drop_na(month, value)
+```
+
+### Make a ggplot
+
+Make, then save, the base line plot as `renew_gg`:
+
+```{r}
+renew_gg <- ggplot(data = renew_date, aes(x = month, y = value, group = description)) +
+  geom_line(aes(color = description)) +
+  theme_minimal() +
+  scale_y_continuous(limits = c(0, 350))
+```
+
+Now try updating your color palette using options from paletteer. Use `View(palettes_d_names)` to see all of the discrete scale options. We'll want a palette with at least 7 colors (length >= 7). Find a name of a palette that you like, then update your graph by adding `scale_color_paletteer_d("package::palette")`. Like, if I want to use the `calecopal::figmtn` palette, I'd add:
+
+`renew_gg + scale_color_paletteer_d("calecopal::figmtn")`
+
+Try some out!
+
+```{r}
+renew_gg +
+  scale_color_paletteer_d("calecopal::figmtn")
+```
+
+Have some fun trying out different color palettes.  
+
+### Coerce to a tsibble:
+
+```{r}
+renew_ts <- as_tsibble(renew_date, key = description, index = month)
+```
+
+### Look at the data in a few different ways:
+```{r}
+renew_ts %>% autoplot(value)
+renew_ts %>% gg_subseries(value)
+renew_ts %>% gg_season(value)
+```
+
+### Get just the wind energy consumption data:
+```{r}
+hydro_ts <- renew_ts %>% 
+  filter(description == "hydroelectric power consumption")
+
+# Explore: 
+hydro_ts %>% autoplot(value)
+hydro_ts %>% gg_subseries(value)
+hydro_ts %>% gg_season(value)
+
+```
+
+### Calculate summary data by time using `index_by()`
+
+What if we want to calculate 
+
+### Some hydro power consumption decomposition
+
+First, let's check the decomposition (STL):
+```{r}
+# Find STL decomposition
+dcmp <- hydro_ts %>%
+  model(STL(value ~ season(window = Inf)))
+
+# View the components
+# components(dcmp)
+
+# Visualize the decomposed components
+components(dcmp) %>% autoplot() +
+  theme_minimal()
+```
+
+
+
+
+
+<!---
+The `fable` package "provides a collection of commonly used univariate and multivariate time series forecasting models including exponential smoothing via state space models and automatic ARIMA modelling". More information: https://github.com/tidyverts/fable
+
+ARIMA forecasting: 
+```{r, eval = FALSE}
+wind_ts %>% model(
+    ets = ETS(box_cox(value, 0.3)),
+    arima = ARIMA(value),
+  ) %>%
+  forecast(h = "5 years") %>% 
+  autoplot(filter(wind_ts, year(month) > 2010), level = NULL)
+
+aus_retail %>%
+  filter(
+    State %in% c("New South Wales", "Victoria"),
+    Industry == "Department stores"
+  ) %>% 
+  model(
+    ets = ETS(box_cox(Turnover, 0.3)),
+    arima = ARIMA(log(Turnover)),
+    snaive = SNAIVE(Turnover)
+  ) %>%
+  forecast(h = "2 years") %>% 
+  autoplot(filter(aus_retail, year(Month) > 2010), level = NULL)
+
+# Testing:
+
+df <- aus_retail %>%
+  filter(
+    State %in% c("New South Wales", "Victoria"),
+    Industry == "Department stores"
+  ) %>% 
+  model(
+    ets = ETS(box_cox(Turnover, 0.3)),
+    arima = ARIMA(log(Turnover)),
+    snaive = SNAIVE(Turnover)
+  ) %>%
+  forecast(h = "2 years")
+```
+
+---->
+
+
