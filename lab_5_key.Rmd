@@ -1,5 +1,5 @@
 ---
-title: 'Lab week 5: time series with feast & fable'
+title: 'Lab week 5: gh-pages, time series with feast & fable, a map'
 author: "Allison Horst"
 date: "2/2/2020"
 output: html_document
@@ -9,25 +9,62 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
+## gh-pages set-up
+
+Some of you have already been working in blogdown. But there are *other* ways that you can make your RMarkdown materials available for others to see. We'll create a repo that contains .Rmd and knitted .html files that we can share as web pages!
+
+**Note**: The gh-pages section of this lab is inspired by materials from Dr. Julia Lowndes (https://jules32.github.io/). 
+
+- On GitHub: @jules32 
+- Twitter: @juliesquid
+
+Julia has written a post on how to make website with RMarkdown and GitHub here: https://jules32.github.io/rmarkdown-website-tutorial/
+
+Follow along with these steps to make your gh-pages branch:
+
+- Create a new GitHub repo called 'my-webpage-test'
+- Click the 'Branch: master' button 
+- Type in (**exactly**): `gh-pages`, and create a new branch
+- Go to Settings > Branches
+- Update the 'Default' branch to `gh-pages`
+- Click on `2 branches` and **delete** the master branch
+- Update your ReadMe to say something unique, then commit
+- Check that it can be viewed as a website with `your-user-name.github.io/repo-name/`
+- Clone your repo to work locally in RStudio
+- Create a new .Rmd called `us-renewables.Rmd`
+
+In that .Rmd: 
+
 ### 0. Attach packages
 
 ```{r}
+# For general stuff:
 library(tidyverse)
 library(janitor)
 library(lubridate)
+library(here)
+library(paletteer)
+
+# For ts stuff: 
 library(tsibble)
-# library(tsibbledata)
+library(fable)
 library(feasts) # Possibly get dev version (gg_season issue): remotes::install_github("tidyverts/feasts")
 library(forecast)
-library(paletteer)
+
+# For spatial stuff: 
+library(sf)
+library(tmap)
 ```
+
+
+## Monthly US energy consumption (renewables)
 
 ### 1. Get the data
 
 We'll explore, then forecast, US energy consumption and production by renewables source. Get the data from `renewables_cons_prod.csv`:
 
 ```{r}
-us_renew <- read_csv("renewables_cons_prod.csv") %>% 
+us_renew <- read_csv(here("data", "renewables_cons_prod.csv")) %>% 
   clean_names()
 ```
 
@@ -115,9 +152,42 @@ hydro_ts %>% gg_season(value)
 
 ### Calculate summary data by time using `index_by()`
 
-What if we want to calculate 
+What if we want to calculate consumption by quarter? We'll use `index_by()` to tell R which "windows" to calculate a value with in. 
 
-### Some hydro power consumption decomposition
+Quarterly:
+```{r}
+hydro_quarterly <- hydro_ts %>% 
+  index_by(year_qu = ~ yearquarter(.)) %>% # monthly aggregates
+  summarise(
+    avg_consumption = mean(value)
+  )
+
+```
+
+Or annually: 
+```{r}
+hydro_annual <- hydro_ts %>% 
+  index_by(annual = ~year(.)) %>% 
+  summarize(
+    avg_consumption = mean(value)
+  )
+
+ggplot(data = hydro_annual, aes(x = annual, y = avg_consumption)) +
+  geom_line(color = "darkorange") +
+  geom_smooth(color = "purple",
+              size = 0.2,
+              linetype = "dashed",
+              fill = "purple",
+              alpha = 0.2) +
+  theme_minimal()
+```
+
+And if you have higher interval data (e.g. hourly), then you can calculate summaries by week, month, etc. using functions from `tsibble` like: 
+
+- `yearweek`
+- `yearmonth`
+
+### Decompose the hydro consumption ts data
 
 First, let's check the decomposition (STL):
 ```{r}
@@ -133,50 +203,41 @@ components(dcmp) %>% autoplot() +
   theme_minimal()
 ```
 
+### Forecast future hydro power consumption 
 
-
-
-
-<!---
-The `fable` package "provides a collection of commonly used univariate and multivariate time series forecasting models including exponential smoothing via state space models and automatic ARIMA modelling". More information: https://github.com/tidyverts/fable
-
-ARIMA forecasting: 
-```{r, eval = FALSE}
-wind_ts %>% model(
-    ets = ETS(box_cox(value, 0.3)),
-    arima = ARIMA(value),
-  ) %>%
-  forecast(h = "5 years") %>% 
-  autoplot(filter(wind_ts, year(month) > 2010), level = NULL)
-
-aus_retail %>%
-  filter(
-    State %in% c("New South Wales", "Victoria"),
-    Industry == "Department stores"
-  ) %>% 
+```{r}
+hydro_model <- hydro_ts %>%
   model(
-    ets = ETS(box_cox(Turnover, 0.3)),
-    arima = ARIMA(log(Turnover)),
-    snaive = SNAIVE(Turnover)
-  ) %>%
-  forecast(h = "2 years") %>% 
-  autoplot(filter(aus_retail, year(Month) > 2010), level = NULL)
-
-# Testing:
-
-df <- aus_retail %>%
-  filter(
-    State %in% c("New South Wales", "Victoria"),
-    Industry == "Department stores"
-  ) %>% 
-  model(
-    ets = ETS(box_cox(Turnover, 0.3)),
-    arima = ARIMA(log(Turnover)),
-    snaive = SNAIVE(Turnover)
+    arima = ARIMA(value)
   ) %>%
   forecast(h = "2 years")
+
+hydro_model %>% autoplot(filter(hydro_ts, year(month) > 2010), level = NULL)
+
 ```
 
----->
+## Map-of-the-day
 
+A world map with bubbles!
+```{r}
+
+# Get spatial data: 
+world <- read_sf(dsn = here("data","TM_WORLD_BORDERS_SIMPL-0.3-1"), layer = "TM_WORLD_BORDERS_SIMPL-0.3") %>% clean_names()
+
+# Initial plot
+plot(world)
+
+# ggplot (static)
+world_base <- ggplot(data = world) +
+  geom_sf(aes(fill = pop2005),
+          color = NA) + 
+  scale_fill_paletteer_c("viridis::viridis") +
+  theme_minimal()
+
+world_base
+
+# Let's crop it: 
+world_base +
+  coord_sf(xlim = c(-20, 50), ylim = c(-40, 40), expand = FALSE)
+```
 
