@@ -55,6 +55,7 @@ library(forecast)
 # For spatial stuff: 
 library(sf)
 library(tmap)
+library(mapview)
 ```
 
 
@@ -104,13 +105,15 @@ renew_date <- renew_clean %>%
 
 ### Make a ggplot
 
-Make, then save, the base line plot as `renew_gg`:
+Make, then save, the baseline plot as `renew_gg`:
 
 ```{r}
 renew_gg <- ggplot(data = renew_date, aes(x = month, y = value, group = description)) +
   geom_line(aes(color = description)) +
   theme_minimal() +
   scale_y_continuous(limits = c(0, 350))
+
+renew_gg
 ```
 
 Now try updating your color palette using options from paletteer. Use `View(palettes_d_names)` to see all of the discrete scale options. We'll want a palette with at least 7 colors (length >= 7). Find a name of a palette that you like, then update your graph by adding `scale_color_paletteer_d("package::palette")`. Like, if I want to use the `calecopal::figmtn` palette, I'd add:
@@ -139,7 +142,7 @@ renew_ts %>% gg_subseries(value)
 renew_ts %>% gg_season(value)
 ```
 
-### Get just the wind energy consumption data:
+### Get just the hydroelectric energy consumption data:
 ```{r}
 hydro_ts <- renew_ts %>% 
   filter(description == "hydroelectric power consumption")
@@ -163,6 +166,7 @@ hydro_quarterly <- hydro_ts %>%
     avg_consumption = mean(value)
   )
 
+head(hydro_quarterly)
 ```
 
 Or annually: 
@@ -194,7 +198,7 @@ First, let's check the decomposition (STL):
 ```{r}
 # Find STL decomposition
 dcmp <- hydro_ts %>%
-  model(STL(value ~ season(window = Inf)))
+  model(STL(value ~ season(window = 5)))
 
 # View the components
 # components(dcmp)
@@ -202,7 +206,22 @@ dcmp <- hydro_ts %>%
 # Visualize the decomposed components
 components(dcmp) %>% autoplot() +
   theme_minimal()
+
+# Let's check out the residuals: 
+
 ```
+
+### Explore the ACF
+
+```{r}
+
+hydro_ts %>% 
+  ACF(value) %>% 
+  autoplot()
+
+```
+
+We see peaks at 12 months: annual-difference similarities in consumption. 
 
 ### Forecast future hydro power consumption 
 
@@ -211,7 +230,7 @@ hydro_model <- hydro_ts %>%
   model(
     arima = ARIMA(value)
   ) %>%
-  forecast(h = "2 years")
+  fabletools::forecast(h = "2 years")
 
 hydro_model %>% autoplot(filter(hydro_ts, year(month) > 2010), level = NULL)
 
@@ -225,8 +244,8 @@ A world map with bubbles!
 # Get spatial data: 
 world <- read_sf(dsn = here("data","TM_WORLD_BORDERS_SIMPL-0.3-1"), layer = "TM_WORLD_BORDERS_SIMPL-0.3") %>% clean_names()
 
-# Initial plot
-plot(world)
+# Quick & easy option to see those polygons (also for points, lines!)
+mapview(world)
 
 # ggplot (static)
 world_base <- ggplot(data = world) +
