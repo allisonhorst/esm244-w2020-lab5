@@ -251,11 +251,15 @@ We see peaks at 12 months: annual-difference similarities in consumption.
 ```{r}
 hydro_model <- hydro_ts %>%
   model(
-    arima = ARIMA(value)
+    arima = ARIMA(value),
+    ets = ETS(value)
   ) %>%
   fabletools::forecast(h = "2 years")
 
-hydro_model %>% autoplot(filter(hydro_ts, year(month_sep) > 2010), level = NULL)
+hydro_model %>% 
+  autoplot(filter(hydro_ts, 
+                  year(month_sep) > 2010), 
+           level = NULL)
 
 ```
 
