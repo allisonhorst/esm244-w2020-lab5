@@ -7,15 +7,20 @@ In this lab we'll use `lubridate` (part of the `tidyverse`), along with the rela
 
 - US Energy Information Administration on [renewable energy consumption by source](https://www.eia.gov/totalenergy/data/browser/?tbl=T10.01#/?f=M)
 
-- NOAA buoy (automatic monitoring) south of Santa Rosa Island (Buoy #46069) accessed from the [NOAA National Data Buoy Center](https://www.ndbc.noaa.gov/download_data.php?filename=46069h2018.txt.gz&dir=data/historical/stdmet/)
-
 ### Packages required: 
 
 - `tidyverse`
 - `janitor`
+- `here`
+- `paletteer`
 - `tsibble`
 - `lubridate`
 - `feasts`
 - `fable`
-- `paletteer`
+- `fabletools`
+- `forecast`
+- `sf`
+- `tmap`
+- `mapview`
+
 
