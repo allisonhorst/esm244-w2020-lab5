@@ -32,7 +32,7 @@ Follow along with these steps to make your gh-pages branch:
 - Check that it can be viewed as a website with `your-user-name.github.io/repo-name/`
 - Clone your repo to work locally in RStudio
 - Copy and paste the `data` folder for this week into your project 
-- Create a new .Rmd called `us-renewables.Rmd`
+- Create a new .Rmd called `us-renewables.Rmd` in the project
 
 In that .Rmd: 
 
@@ -49,7 +49,8 @@ library(paletteer)
 # For ts stuff: 
 library(tsibble)
 library(fable)
-library(feasts) # Possibly get dev version (gg_season issue): remotes::install_github("tidyverts/feasts")
+library(fabletools)
+library(feasts)
 library(forecast)
 
 # For spatial stuff: 
@@ -93,14 +94,19 @@ renew_clean <- us_renew %>%
   filter(!str_detect(description, pattern = "total"))
 ```
 
-### Convert `yyyymm` column to tsibble with `lubridate`
+### Convert `yyyymm` column to date with `lubridate`
 
 ```{r}
 renew_date <- renew_clean %>% 
-  mutate(month = lubridate::parse_date_time(yyyymm, "ym")) %>% 
-  mutate(month = yearmonth(month)) %>% #coerce to `yearmonth` format
+  mutate(yr_mo_day = lubridate::parse_date_time(yyyymm, "ym")) %>% 
+  mutate(month_sep = yearmonth(yr_mo_day)) %>% #coerce to tsibble `yearmonth` format
   mutate(value = as.numeric(value)) %>% 
-  drop_na(month, value)
+  drop_na(month_sep, value)
+
+# Want to parse the year and month? We may use this later...
+renew_parsed <-renew_date %>% 
+  mutate(month = month(yr_mo_day, label = TRUE)) %>% 
+  mutate(year = year(yr_mo_day))
 ```
 
 ### Make a ggplot
@@ -108,7 +114,7 @@ renew_date <- renew_clean %>%
 Make, then save, the baseline plot as `renew_gg`:
 
 ```{r}
-renew_gg <- ggplot(data = renew_date, aes(x = month, y = value, group = description)) +
+renew_gg <- ggplot(data = renew_date, aes(x = month_sep, y = value, group = description)) +
   geom_line(aes(color = description)) +
   theme_minimal() +
   scale_y_continuous(limits = c(0, 350))
@@ -132,7 +138,7 @@ Have some fun trying out different color palettes.
 ### Coerce to a tsibble:
 
 ```{r}
-renew_ts <- as_tsibble(renew_date, key = description, index = month)
+renew_ts <- as_tsibble(renew_parsed, key = description, index = month_sep)
 ```
 
 ### Look at the data in a few different ways:
@@ -140,6 +146,17 @@ renew_ts <- as_tsibble(renew_date, key = description, index = month)
 renew_ts %>% autoplot(value)
 renew_ts %>% gg_subseries(value)
 renew_ts %>% gg_season(value)
+
+# What if gg_season() didn't work? Well we can make this with ggplot anyway!
+# Remember our other parsed version (renew parsed):
+
+ggplot(data = renew_parsed, aes(x = month, y = value, group = year)) +
+  geom_line(aes(color = year)) +
+  facet_wrap(~ description, 
+             ncol = 1, 
+             scales = "free", 
+             strip.position = "right")
+  
 ```
 
 ### Get just the hydroelectric energy consumption data:
@@ -152,6 +169,11 @@ hydro_ts %>% autoplot(value)
 hydro_ts %>% gg_subseries(value)
 hydro_ts %>% gg_season(value)
 
+# OK, what if gg_season() doesn't work?
+# It's just a function that uses ggplot() to do things we already know how to do in ggplot()!
+ggplot(hydro_ts, aes(x = month, y = value, group = year)) +
+  geom_line(aes(color = year))
+  
 ```
 
 ### Calculate summary data by time using `index_by()`
@@ -207,7 +229,8 @@ dcmp <- hydro_ts %>%
 components(dcmp) %>% autoplot() +
   theme_minimal()
 
-# Let's check out the residuals: 
+# Let's check out the residuals:
+hist(components(dcmp)$remainder)
 
 ```
 
@@ -232,7 +255,7 @@ hydro_model <- hydro_ts %>%
   ) %>%
   fabletools::forecast(h = "2 years")
 
-hydro_model %>% autoplot(filter(hydro_ts, year(month) > 2010), level = NULL)
+hydro_model %>% autoplot(filter(hydro_ts, year(month_sep) > 2010), level = NULL)
 
 ```
 
